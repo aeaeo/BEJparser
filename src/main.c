@@ -12,10 +12,10 @@ print_usage(const char *program_name)
 		"Usage: %s [-a <annotation_dictionary_file>] -s <schema_dictionary_file> -b <bej_file> [-o <output_file>]\n\n"
 		"Options:\n\n"
 			"\t-a\tSpecify the annotation dictionary file (optional)\n"
-			"\t-b\tSpecify the BEJ binary file to decode (required)\n"
+			"\t-b\tSpecify the BEJ binary file to decode (REQUIRED)\n"
 			"\t-h\tShow this message\n"
-			"\t-o\tSpecify output JSON file (default: stdout)\n"
-			"\t-s\tSpecify the schema dictionary file (required)\n",
+			"\t-o\tSpecify output JSON file, defaults to stdout otherwise\n"
+			"\t-s\tSpecify the schema dictionary file (REQUIRED)\n",
 		program_name);
 }
 
@@ -38,15 +38,15 @@ read_file(const char *filename, uint8_t *buffer, size_t max_size)
     if (file_size < 0 || file_size > max_size) {
         fprintf(stderr, "Error: File %s is too large or invalid\n", filename);
         fclose(f);
-        return 0;
+        return 1;
     }
     
     size_t bytes_read = fread(buffer, 1, file_size, f);
     fclose(f);
     
     if (bytes_read != file_size) {
-        fprintf(stderr, "Error: Failed to read complete file '%s'\n", filename);
-        return 0;
+        fprintf(stderr, "Error: Failed to read complete file %s\n", filename);
+        return 1;
     }
     
     return bytes_read;
@@ -87,16 +87,36 @@ main(int argc, char** argv)
 		case 'h':
 		default:
 			print_usage(argv[0]);
-			return -1;
+			return 1;
 		}
 	}
 
 	if (!bej_file || !schema_file) {
-		fprintf(stderr, "Error: missed required arguments\n\n");
+		fprintf(stderr, "Error: required argument(s) are not specified\n\n");
 		print_usage(argv[0]);
-		return -1;
+		return 1;
 	}
 
+	/*annotation possibly here */
+
+	schema_dict_size = read_file(schema_file, schema_dict_data, sizeof(schema_dict_data));
+    if (schema_dict_size == 0) {
+        return 1;
+    }
+
+	bej_size = read_file(bej_file, bej_data, sizeof(bej_data));
+    if (bej_size == 0) {
+        return 1;
+    }
+    
+    FILE *output = stdout;
+    if (output_file) {
+        output = fopen(output_file, "w");
+        if (!output) {
+            fprintf(stderr, "Error: Failed to open output file %s\n", output_file);
+            return 1;
+        }
+    }
 
 	//
 

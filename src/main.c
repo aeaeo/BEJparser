@@ -1,21 +1,21 @@
-#include <getopt.h>
 #include "bej.h"
+#include <getopt.h>
 
 /*
- * Actually just prints help information.
+ * Prints help information.
  */
 static void
 print_usage(const char *program_name)
 {
-	fprintf(stderr,
-		"Overview: binary encoded json decoder to json format\n\n"
-		"Usage: %s [-a <annotation_dictionary_file>] -s <schema_dictionary_file> -b <bej_file> [-o <output_file>]\n\n"
+	fprintf(stdout,
+		"Overview: A Redfish binary encoded json decoder to UTF-8 json format. Copyleft 🄯 2025 aeaeo.\n\n"
+		"Usage: %s "/*[-a <annotation_dictionary_file>]*/"-s <schema_dictionary_file> -b <bej_file> [-o <output_file>]\n\n"
 		"Options:\n\n"
-			"\t-a\tSpecify the annotation dictionary file (optional)\n"
-			"\t-b\tSpecify the BEJ binary file to decode (REQUIRED)\n"
-			"\t-h\tShow this message\n"
-			"\t-o\tSpecify output JSON file, defaults to stdout otherwise\n"
-			"\t-s\tSpecify the schema dictionary file (REQUIRED)\n",
+			//"\t-a\tSpecify the annotation dictionary file (optional)\n"
+			"\t-b\tSpecify the BEJ binary file to decode. Required.\n"
+			"\t-h\tShow help message.\n"
+			"\t-o\tSpecify output JSON file. Optional, default is stdout\n"
+			"\t-s\tSpecify the schema dictionary file. Required.\n",
 		program_name);
 }
 
@@ -27,7 +27,7 @@ read_file(const char *filename, uint8_t *buffer, size_t max_size)
 {
     FILE *f = fopen(filename, "rb");
     if (!f) {
-        fprintf(stderr, "Error: Failed to open file %s\n", filename);
+		errmsg("Failed to open file %s\n", filename);
         return 0;
     }
     
@@ -36,17 +36,17 @@ read_file(const char *filename, uint8_t *buffer, size_t max_size)
     fseek(f, 0, SEEK_SET);
     
     if (file_size < 0 || file_size > max_size) {
-        fprintf(stderr, "Error: File %s is too large or invalid\n", filename);
+        errmsg("File %s is too large or invalid\n", filename);
         fclose(f);
-        return 1;
+        return 0;
     }
     
     size_t bytes_read = fread(buffer, 1, file_size, f);
     fclose(f);
     
     if (bytes_read != file_size) {
-        fprintf(stderr, "Error: Failed to read complete file %s\n", filename);
-        return 1;
+        errmsg("Error: Failed to read complete file %s\n", filename);
+        return 0;
     }
     
     return bytes_read;
@@ -56,69 +56,80 @@ int
 main(int argc, char** argv)
 {
 	uint8_t schema_dict_data[65536] = {0};
-	size_t schema_dict_size = 0UL;
-	uint8_t anno_dict_data[65536] = {0};
-	size_t anno_dict_size = 0UL;
+	//uint8_t anno_dict_data[65536] = {0};
 	uint8_t bej_data[65536] = {0};
+	size_t schema_dict_size = 0UL;
+	//size_t anno_dict_size = 0UL;
 	size_t bej_size = 0UL;
-
-	char* anno_file = NULL;
-	char* schema_file = NULL;	// TODO: make optional; also possibly no need of this due to simplification
-
-	char* bej_file = NULL;
 	char* output_file = NULL;
+	FILE *output = stdout;
 
-	int option = getopt(argc, argv, "ha:b:s:o:");
-
-	while (option != EOF) {
+	int option = EOF;
+	while ((option = getopt(argc, argv, "h"/*a:*/"b:s:o:")) != EOF) {
 		switch (option) {
-		case 'a':
-			anno_file = optarg;
-			break;
+		//case 'a':
+			/* todo: annotation dict */
+		//	anno_file = optarg;
+		//	break;
 		case 'b':
-			bej_file = optarg;
+			bej_size = read_file(optarg, bej_data, sizeof(bej_data));
+			if (!bej_size)
+				return FAILURE;
 			break;
 		case 's':
-			schema_file = optarg;
+			schema_dict_size = read_file(optarg, schema_dict_data, sizeof(schema_dict_data));
+			if (!schema_dict_size)
+				return FAILURE;
 			break;
 		case 'o':
 			output_file = optarg;
+			if (output_file) {
+				output = fopen(output_file, "w");
+				if (!output) {
+					errmsg("Failed to open output file %s\n", output_file);
+					return FAILURE;
+				}
+			}
 			break;
 		case 'h':
 		default:
 			print_usage(argv[0]);
-			return 1;
+			return SUCCESS;
 		}
 	}
 
-	if (!bej_file || !schema_file) {
-		fprintf(stderr, "Error: required argument(s) are not specified\n\n");
+	if (!bej_size || !schema_dict_size) {
+		errmsg("Both -s and -b options are required\n");
 		print_usage(argv[0]);
-		return 1;
+		return FAILURE;
 	}
 
-	/*annotation possibly here */
-
-	schema_dict_size = read_file(schema_file, schema_dict_data, sizeof(schema_dict_data));
-    if (schema_dict_size == 0) {
-        return 1;
-    }
-
-	bej_size = read_file(bej_file, bej_data, sizeof(bej_data));
-    if (bej_size == 0) {
-        return 1;
+	bej_context_t ctx;
+    if (bej_init_context(&ctx,
+						 schema_dict_data, schema_dict_size,
+						 //anno_dict_data, anno_dict_size,
+						 bej_data, bej_size,
+						 output)) {
+		errmsg("Failed to initialize BEJ context\n");
+        if (output != stdout)
+            fclose(output);
+        return FAILURE;
     }
     
-    FILE *output = stdout;
-    if (output_file) {
-        output = fopen(output_file, "w");
-        if (!output) {
-            fprintf(stderr, "Error: Failed to open output file %s\n", output_file);
-            return 1;
-        }
+    uint8_t result = bej_decode(&ctx);
+    if (result) {
+		errmsg("Failed to decode BEJ data\n");
+        if (output != stdout)
+            fclose(output);
+        return FAILURE;
     }
+    
+    fprintf(output, "\n");
 
-	//
+    if (output != stdout) {
+        fclose(output);
+        printf("Successfully decoded BEJ to %s\n", output_file);
+    }
 
 	return 0;
 }

@@ -1,4 +1,3 @@
-//#define NDEBUG
 #include "bej.h"
 
 uint8_t
@@ -84,17 +83,18 @@ bej_parse_dict(bej_dictionary_context_t *dict, uint8_t *data, size_t size)
 }
 
 uint8_t
-bej_find_dict_entry(bej_dictionary_context_t *dict, uint32_t sequence,
-                    bej_dict_entry_t *entry)
+bej_find_dict_entry(bej_context_t *ctx, bej_dictionary_context_t *dict,
+                    uint32_t sequence, bej_dict_entry_t *entry)
 {
     if (!dict || !entry || !dict->data) {
         errmsg("Invalid parameters for dictionary lookup");
         return FAILURE;
     }
 
-    size_t offset = 12UL; // skip header
+    size_t offset = ctx->parent_child_offset; // skip header or go to child
+    uint16_t count = ctx->parent_child_count;
 
-    for (uint16_t i = 0; i < dict->entry_count; i++) {
+    for (uint16_t i = 0; i < count; i++) {
         if (offset + 12UL > dict->data_size) {
             errmsg("Dictionary entry exceeds bounds");
             return FAILURE;
@@ -162,7 +162,7 @@ void
 write_indent(bej_context_t *ctx)
 {
     for (int i = 0; i < ctx->indent_level; i++) {
-        fprintf(ctx->output, "  ");
+        fprintf(ctx->output, "\t");
     }
 }
 
@@ -230,7 +230,7 @@ decode_string(bej_context_t *ctx, uint8_t *value, uint32_t length)
 
 uint8_t
 decode_enum(bej_context_t *ctx, uint8_t *value, uint32_t length,
-            bej_dictionary_context_t *dict, uint32_t parent_seq)
+            bej_dictionary_context_t *dict)
 {
     size_t offset = 0UL;
     uint32_t enum_value = 0U;
@@ -240,24 +240,25 @@ decode_enum(bej_context_t *ctx, uint8_t *value, uint32_t length,
         return FAILURE;
     }
     
-    // getting parent entry to find enum children
-    //bej_dict_entry_t parent_entry;
-    //if (bej_find_dict_entry(dict, parent_seq, &parent_entry)) {
-    //    fprintf(ctx->output, "null");
-    //    return SUCCESS;
-    //}
-    
     // find enum string in child entries
     bej_dict_entry_t enum_entry;
-    if (!bej_find_dict_entry(dict, enum_value, &enum_entry)) {
+    if (!bej_find_dict_entry(ctx, dict, enum_value, &enum_entry)) {
         char enum_name[256];
         if (!bej_get_entry_name(dict, &enum_entry, enum_name, sizeof(enum_name))) {
             fprintf(ctx->output, "\"%s\"", enum_name);
+
+            ctx->parent_child_offset = 12U;
+            ctx->parent_child_count = dict->entry_count;
+
             return SUCCESS;
         }
     }
     // print numeric then
     fprintf(ctx->output, "%u", enum_value);
+
+    ctx->parent_child_offset = 12U;
+    ctx->parent_child_count = dict->entry_count;
+
     return SUCCESS;
 }
 
@@ -284,7 +285,7 @@ decode_set(bej_context_t *ctx, uint32_t length,
         write_indent(ctx);
         
         // set elements have names from dictionary
-        if (decode_bej_sflv(ctx, dict, 0, 1)) {
+        if (decode_bej_sflv(ctx, dict, 1U)) {
             ctx->indent_level--;
             return FAILURE;
         }
@@ -305,13 +306,16 @@ decode_set(bej_context_t *ctx, uint32_t length,
                 set_end, ctx->offset);
         ctx->offset = set_end;
     }
+
+    ctx->parent_child_offset = 12U;
+    ctx->parent_child_count = dict->entry_count;
     
     return SUCCESS;
 }
 
 uint8_t
 decode_array(bej_context_t *ctx, uint32_t length,
-             bej_dictionary_context_t *dict, uint8_t add_name)
+             bej_dictionary_context_t *dict, uint8_t add_names)
 {   // same things as for set here except for no names
     fprintf(ctx->output, "[\n");
     ctx->indent_level++;
@@ -332,7 +336,7 @@ decode_array(bej_context_t *ctx, uint32_t length,
         write_indent(ctx);
         
         // ...whereas arrays doesn't
-        if (decode_bej_sflv(ctx, dict, 1, 0)) {
+        if (decode_bej_sflv(ctx, dict, 0U)) {
             ctx->indent_level--;
             return FAILURE;
         }
@@ -352,20 +356,22 @@ decode_array(bej_context_t *ctx, uint32_t length,
                 array_end, ctx->offset);
         ctx->offset = array_end;
     }
+
+    ctx->parent_child_offset = 12UL;
+    ctx->parent_child_count = dict->entry_count;
     
     return SUCCESS;
 }
 
 uint8_t
 decode_bej_sflv(bej_context_t *ctx, bej_dictionary_context_t *dict, 
-                uint8_t is_first, uint8_t add_name)
+                uint8_t add_name)
 {
     uint32_t sequence = 0U;
     uint8_t dict_selector = 0U;
 
     uint8_t format = 0U;
     uint8_t flags = 0U;
-
     uint32_t length = 0U;
 
     if (bej_read_sequence_number(ctx->bej_data, &ctx->offset, ctx->bej_size,
@@ -388,34 +394,33 @@ decode_bej_sflv(bej_context_t *ctx, bej_dictionary_context_t *dict,
     }
     
     uint8_t *value = &ctx->bej_data[ctx->offset];
-    size_t value_start_offset = ctx->offset;
     
     // performing dict lookup
-    if (!is_first) {
-        bej_dict_entry_t entry;
-        uint8_t found_entry = !bej_find_dict_entry(dict, sequence, &entry);
+    bej_dict_entry_t entry;
+    uint8_t found_entry = !bej_find_dict_entry(ctx, dict, sequence, &entry);
+    
+    if (found_entry) {
+        char name[256] = {0};
+        bej_get_entry_name(dict, &entry, name, sizeof(name));
         
-        if (found_entry) {
-            char name[256] = {0};
-            bej_get_entry_name(dict, &entry, name, sizeof(name));
-            
-            dbgmsg("Decoding entry: seq=%u, format=%u, name=\"%s\"", 
-                sequence, format, name);
+        dbgmsg("Decoding entry: seq=%u, format=%u, name=\"%s\"", 
+            sequence, format, name);
 
-            if (add_name && name[0] != '\0') {
-                fprintf(ctx->output, "\"%s\": ", name);
-            }
-        } else {    // if FAILURE, making up the name based of seq
-            dbgmsg("Decoding unknown entry: seq=%u, format=%u", sequence, format);
-            if (add_name) {
-                fprintf(ctx->output, "\"unknown_%u\": ", sequence);
-            }
+        if (add_name && name[0] != '\0') {
+            fprintf(ctx->output, "\"%s\": ", name);
+        }
+    } else {    // this one unlikely, but let's the name based of seq
+        dbgmsg("Decoding unknown entry: seq=%u, format=%u", sequence, format);
+        if (add_name) {
+            fprintf(ctx->output, "\"unknown_%u\": ", sequence);
         }
     }
     
     switch (format) {
         case BEJ_FORMAT_SET:
         case BEJ_FORMAT_ARRAY:
+            ctx->parent_child_offset = entry.child_offset;
+            ctx->parent_child_count = entry.child_count;
             return (!format) ? decode_set(ctx, length, dict, add_name) :
                                decode_array(ctx, length, dict, add_name);
         case BEJ_FORMAT_INTEGER:
@@ -426,7 +431,9 @@ decode_bej_sflv(bej_context_t *ctx, bej_dictionary_context_t *dict,
             return decode_string(ctx, value, length);
         case BEJ_FORMAT_ENUM:
             ctx->offset += length;
-            return decode_enum(ctx, value, length, dict, sequence);
+            ctx->parent_child_offset = entry.child_offset;
+            ctx->parent_child_count = entry.child_count;
+            return decode_enum(ctx, value, length, dict);
         case BEJ_FORMAT_BOOLEAN:
             ctx->offset += length;
             fprintf(ctx->output, (length > 0 && value[0]) ? "true" : "false");
@@ -461,15 +468,14 @@ bej_decode(bej_context_t *ctx)
     if (!(ctx->bej_data[0] == 0x00 && ctx->bej_data[1] == 0xF0
         && (ctx->bej_data[2] == 0xF0 || ctx->bej_data[2] == 0xF1)
         && ctx->bej_data[3] == 0xF1)) {
-        errmsg("Unsupported BEJ version field: %02x %02x %02x %02x",
-               ctx->bej_data[0], ctx->bej_data[1], 
-               ctx->bej_data[2], ctx->bej_data[3]);
+        errmsg("Unsupported BEJ version field: %#x",
+               READ_U32_LE(ctx->bej_data, ctx->offset));
         return FAILURE;
     }
 
     if (!(ctx->bej_data[4] == 0x00 && ctx->bej_data[5] == 0x00)) {
-        warnmsg("Non-zero BEJ flags: %#02x %#02x",
-        ctx->bej_data[4], ctx->bej_data[5]);
+        warnmsg("Non-zero BEJ flags: %#x",
+                READ_U16_LE(ctx->bej_data, ctx->offset));
     }
 
     if (!(ctx->bej_data[6] == 0x00 || ctx->bej_data[5] == 0x01)) {
@@ -485,7 +491,7 @@ bej_decode(bej_context_t *ctx)
     dbgmsg("Header is valid. Starting BEJ decode, data size: %zu bytes", ctx->bej_size);
 
     // decoding the root SFLV
-    return decode_bej_sflv(ctx, &ctx->schema_dict, 1U, 0U);
+    return decode_bej_sflv(ctx, &ctx->schema_dict, 0U);
 }
 
 void
@@ -509,7 +515,7 @@ bej_dump_dictionary(bej_dictionary_context_t *dict, uint16_t max_entries)
                                ? dict->entry_count : max_entries;
     
     for (uint16_t i = 0; i < entries_to_show && offset < dict->data_size; i++) {
-        infomsg("\n--- Entry %u (offset %zu) ---\n", i, offset);
+        infomsg("\n--- Entry %u (offset %#zx) ---", i, offset);
         
         uint8_t format = READ_U8_AND_INC(dict->data, offset);
         uint16_t seq = READ_U16_LE(dict->data, offset);
@@ -524,19 +530,16 @@ bej_dump_dictionary(bej_dictionary_context_t *dict, uint16_t max_entries)
 
         infomsg("\n\tFormat: %u"
                 "\n\tSequence: %u"
-                "\n\tChild Pointer Offset: %u"
+                "\n\tChild Pointer Offset: %#x"
                 "\n\tChild Count: %u"
                 "\n\tName length: %u"
-                "\n\tName offset: %u",
+                "\n\tName offset: %#x",
                 format, seq, child_offset_ptr, child_count, name_length, name_off);
         
-        if (name_off > 0 && name_off < dict->data_size) {
-            uint8_t name_len = dict->data[name_off];
-            infomsg("\tName Length: %u", name_len);
-            
-            if (name_len > 0 && name_off + 1 + name_len <= dict->data_size) {
+        if (name_off > 0 && name_off < dict->data_size) {            
+            if (name_length > 0 && name_off + 1 + name_length <= dict->data_size) {
                 char name_buf[256];
-                size_t copy_len = (name_len < sizeof(name_buf) - 1) ? name_len : sizeof(name_buf) - 1;
+                size_t copy_len = (name_length < sizeof(name_buf) - 1) ? name_length : sizeof(name_buf) - 1;
                 memcpy(name_buf, &dict->data[name_off], copy_len);
                 name_buf[copy_len] = '\0';
                 infomsg("\tName: '%s'", name_buf);
@@ -582,6 +585,8 @@ bej_init_context(bej_context_t *ctx,
     ctx->offset = 0UL;
     ctx->output = output;
     ctx->indent_level = 0;
+    ctx->parent_child_offset = 12L;
+    ctx->parent_child_count = ctx->schema_dict.entry_count;
     
     return SUCCESS;
 }

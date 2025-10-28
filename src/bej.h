@@ -17,31 +17,6 @@ enum eBEJtype {
     BEJ_FORMAT_PROPERTY_ANNOTATION = 0x10
 };
 
-/*
-* BEJ header struct
-*/
-typedef struct {
-    uint32_t version;
-    uint16_t flags;
-    uint8_t schemaClass;
-    uint8_t _pad0;
-} beh_encoding_t;
-
-/*
-* BEJ non-negative integer struct
-*/
-/*typedef struct {
-    uint8_t bytes_length;
-    size_t value;
-} bej_nnint_t;
-
-typedef struct {
-    bej_nnint_t bejTupleS;
-    uint8_t bejTupleF;
-    uint32_t bejTupleL;
-    uint8_t *bejTupleV;
-} bej_tuple_t;*/
-
 typedef struct {
     uint8_t version_tag;
     uint8_t truncation_flag;    // not a flag but flags, only the named one is used though
@@ -62,7 +37,7 @@ typedef struct {
 } bej_dict_entry_t;
 
 /*
-* @brief This one is a helper struct to maintain decoder context and reduce verbosity
+* @brief This one is a helper struct to maintain decoder context and mainly reduce verbosity
 */
 typedef struct {
     bej_dictionary_context_t schema_dict;
@@ -72,6 +47,8 @@ typedef struct {
     size_t offset;
     FILE *output;
     int indent_level;
+    uint16_t parent_child_offset;
+    uint16_t parent_child_count;
 } bej_context_t;
 
 /*
@@ -106,7 +83,7 @@ uint8_t bej_read_sequence_number(uint8_t *data, size_t *offset, size_t size, uin
 /*
 * Find dictionary entry by sequence number
 */
-uint8_t bej_find_dict_entry(bej_dictionary_context_t *dict, uint32_t sequence, bej_dict_entry_t *entry);
+uint8_t bej_find_dict_entry(bej_context_t *ctx, bej_dictionary_context_t *dict, uint32_t sequence, bej_dict_entry_t *entry);
 
 /*
 * Get dictionary entry name
@@ -117,11 +94,13 @@ uint8_t bej_get_entry_name(bej_dictionary_context_t *dict, bej_dict_entry_t *ent
 uint8_t bej_read_format(uint8_t *data, size_t *offset, size_t size, 
                               uint8_t *format, uint8_t *flags);
 uint8_t decode_bej_sflv(bej_context_t *ctx, bej_dictionary_context_t *dict, 
-                               uint8_t is_first, uint8_t add_name);
+                        uint8_t add_name);
+uint8_t decode_enum(bej_context_t *ctx, uint8_t *value, uint32_t length,
+                    bej_dictionary_context_t *dict);
 uint8_t decode_set(bej_context_t *ctx, uint32_t length, 
-                          bej_dictionary_context_t *dict, uint8_t add_name);
+                   bej_dictionary_context_t *dict, uint8_t add_name);
 uint8_t decode_array(bej_context_t *ctx, uint32_t length,
-                            bej_dictionary_context_t *dict, uint8_t add_name);
+                     bej_dictionary_context_t *dict, uint8_t add_name);
 void write_indent(bej_context_t *ctx);
 
 void bej_dump_dictionary(bej_dictionary_context_t *dict, uint16_t max_entries);

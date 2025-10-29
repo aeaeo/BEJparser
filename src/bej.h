@@ -69,6 +69,7 @@ typedef struct {
     uint16_t parent_child_count[BEJ_CONTEXT_STACK_MAX_DEPTH];
 } bej_context_t;
 
+
 /**
  * @brief Converts BEJ encoded data to JSON format. This function is main decoder interface.
  * 
@@ -76,6 +77,7 @@ typedef struct {
  * @return SUCCESS or FAILURE
  */
 uint8_t bej_decode(bej_context_t *ctx);
+
 
 /**
  * @brief Initialize BEJ decoder context
@@ -93,6 +95,7 @@ uint8_t bej_init_context(bej_context_t *ctx,
                          uint8_t *bej_data, size_t bej_size,
                          FILE *output);
 
+
 /**
  * @brief Parse BEJ dictionary
  * 
@@ -102,6 +105,7 @@ uint8_t bej_init_context(bej_context_t *ctx,
  * @return SUCCESS or FAILURE
  */
 uint8_t bej_parse_dict(bej_dictionary_context_t *dict, uint8_t *data, size_t size);
+
 
 /**
  * @brief Read NNINT (Non-Negative Integer) from BEJ stream
@@ -116,6 +120,7 @@ uint8_t bej_parse_dict(bej_dictionary_context_t *dict, uint8_t *data, size_t siz
  */
 uint8_t bej_read_nnint(uint8_t *data, size_t *offset, size_t size, uint32_t *value);
 
+
 /**
  * @brief Read and decode sequence number
  * 
@@ -128,6 +133,7 @@ uint8_t bej_read_nnint(uint8_t *data, size_t *offset, size_t size, uint32_t *val
  */
 uint8_t bej_read_sequence_number(uint8_t *data, size_t *offset, size_t size, uint32_t *seqnum, uint8_t *dictselector);
 
+
 /**
  * @brief Find dictionary entry by sequence number
  * 
@@ -138,6 +144,7 @@ uint8_t bej_read_sequence_number(uint8_t *data, size_t *offset, size_t size, uin
  * @return SUCCESS or FAILURE
  */
 uint8_t bej_find_dict_entry(bej_context_t *ctx, bej_dictionary_context_t *dict, uint32_t sequence, bej_dict_entry_t *entry);
+
 
 /**
  * @brief Get dictionary entry name
@@ -150,6 +157,7 @@ uint8_t bej_find_dict_entry(bej_context_t *ctx, bej_dictionary_context_t *dict, 
  */
 uint8_t bej_get_entry_name(bej_dictionary_context_t *dict, bej_dict_entry_t *entry, 
                            char *name, size_t name_size);
+
 
 /**
  * @brief Read and decode sequence number
@@ -165,6 +173,7 @@ uint8_t bej_get_entry_name(bej_dictionary_context_t *dict, bej_dict_entry_t *ent
 uint8_t bej_read_format(uint8_t *data, size_t *offset, size_t size, 
                         uint8_t *format, uint8_t *flags);
 
+
 /**
  * @brief Recursively decode SFLV blocks starting from root
  * 
@@ -176,16 +185,40 @@ uint8_t bej_read_format(uint8_t *data, size_t *offset, size_t size,
 uint8_t decode_bej_sflv(bej_context_t *ctx, bej_dictionary_context_t *dict, 
                         uint8_t add_name);
 
+
+/**
+ * @brief Decode Integer enum object
+ * 
+ * @param ctx BEJ decoder context
+ * @param value Integer value pointer
+ * @param length Value length
+ * @return SUCCESS or FAILURE
+ */
+uint8_t decode_integer(bej_context_t *ctx, uint8_t *value, uint32_t length);
+
+
+/**
+ * @brief Decode String enum object
+ * 
+ * @param ctx BEJ decoder context
+ * @param value String value pointer
+ * @param length Value length
+ * @return SUCCESS or FAILURE
+ */
+uint8_t decode_string(bej_context_t *ctx, uint8_t *value, uint32_t length);
+
+
 /**
  * @brief Decode SFLV enum object
  * 
  * @param ctx BEJ decoder context
- * @param value Integer value of the sequence number for the enumeration option selected
+ * @param value Integer value pointer of the sequence number for the enumeration option selected
  * @param length Value length
  * @return SUCCESS or FAILURE
  */
 uint8_t decode_enum(bej_context_t *ctx, uint8_t *value, uint32_t length,
                     bej_dictionary_context_t *dict);
+
 
 /**
  * @brief Decode SFLV set object recursively
@@ -196,6 +229,7 @@ uint8_t decode_enum(bej_context_t *ctx, uint8_t *value, uint32_t length,
  */
 uint8_t decode_set(bej_context_t *ctx, uint32_t length, 
                    bej_dictionary_context_t *dict, uint8_t add_name);
+
 
 /**
  * @brief Decode SFLV array object recursively

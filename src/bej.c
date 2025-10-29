@@ -1,3 +1,7 @@
+/**
+ * @file bej.c
+ * @brief Main BEJ decoder implementation
+ */
 #include "bej.h"
 
 uint8_t
@@ -18,7 +22,7 @@ bej_read_nnint(uint8_t *data, size_t *offset, size_t size,
 
     *offset += 1 + nnint_bytes_length;
 
-    return SUCCESS;//1 + nnint_bytes_length;
+    return SUCCESS;
 }
 
 uint8_t
@@ -166,7 +170,7 @@ static void
 write_indent(bej_context_t *ctx)
 {
     for (int i = 0; i < ctx->indent_level; i++) {
-        fprintf(ctx->output, "\t");
+        fputc('\t', ctx->output);
     }
 }
 
@@ -413,7 +417,6 @@ decode_bej_sflv(bej_context_t *ctx, bej_dictionary_context_t *dict,
                 errmsg("BEJ nesting too deep");
                 return FAILURE;
             }
-            //ctx->indent_level++;
             ctx->parent_child_offset[ctx->indent_level+1] = entry.child_offset;
             ctx->parent_child_count[ctx->indent_level+1] = entry.child_count;
 
@@ -438,6 +441,7 @@ decode_bej_sflv(bej_context_t *ctx, bej_dictionary_context_t *dict,
             ctx->offset += length;
             fprintf(ctx->output, "null");
             return SUCCESS;
+        // todo: more types
         default:
             warnmsg("Unknown format type: %u", format);
             ctx->offset += length;

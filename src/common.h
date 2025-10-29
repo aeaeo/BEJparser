@@ -1,5 +1,4 @@
 #pragma once
-#include <stdbool.h>
 #include <stddef.h> // size_t
 #include <stdint.h>
 #include <stdio.h>

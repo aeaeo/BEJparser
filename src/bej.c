@@ -242,8 +242,10 @@ decode_enum(bej_context_t *ctx, uint8_t *value, uint32_t length,
 {
     size_t offset = 0UL;
     uint32_t enum_value = 0U;
+    ctx->indent_level++;
     
     if (bej_read_nnint(value, &offset, length, &enum_value)) {
+        ctx->indent_level--;
         errmsg("Failed to read enum value");
         return FAILURE;
     }
@@ -254,12 +256,14 @@ decode_enum(bej_context_t *ctx, uint8_t *value, uint32_t length,
         char enum_name[BEJ_DICT_ENTRY_NAME_LENGTH+1];
         if (!bej_get_entry_name(dict, &enum_entry, enum_name, sizeof(enum_name))) {
             fprintf(ctx->output, "\"%s\"", enum_name);
-
+            ctx->indent_level--;
             return SUCCESS;
         }
     }
+
     // print numeric then
     fprintf(ctx->output, "%u", enum_value);
+    ctx->indent_level--;
 
     return SUCCESS;
 }

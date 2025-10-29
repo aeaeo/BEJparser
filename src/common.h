@@ -13,14 +13,17 @@
 
 #define errmsg(fmt, ...) \
     fprintf(stderr, "Error at %s():%d What: " fmt "\n", __func__, __LINE__, ##__VA_ARGS__)
+
 #define warnmsg(fmt, ...) \
     fprintf(stdout, "Warning at %s():%d What: " fmt "\n", __func__, __LINE__, ##__VA_ARGS__)
+    
 #ifdef NDEBUG
 #define dbgmsg(fmt, ...) \
     fprintf(stdout, "[DEBUG] %s():%d: " fmt "\n", __func__, __LINE__, ##__VA_ARGS__)
 #else
 #define dbgmsg(fmt, ...) ((void)0)
 #endif /* NDEBUG */
+
 #define infomsg(fmt, ...) \
     fprintf(stdout, fmt "\n", ##__VA_ARGS__)
 

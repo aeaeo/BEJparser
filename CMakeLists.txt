@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.30)
-project(bej_parser C CXX)
+project(BEJparser C CXX)
 
 # using latest
 set(CMAKE_C_STANDARD 23)

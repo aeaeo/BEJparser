@@ -1,5 +1,6 @@
 #pragma once
 #include "common.h"
+
 /*
 * Some possible BEJ types as specified in DSP0218 Section 7.2.4
 */
@@ -14,9 +15,22 @@ enum eBEJtype {
     BEJ_FORMAT_BOOLEAN = 0x07,
     BEJ_FORMAT_BYTE_STRING = 0x08,
     BEJ_FORMAT_CHOICE = 0x09,
-    BEJ_FORMAT_PROPERTY_ANNOTATION = 0x10
+    BEJ_FORMAT_PROPERTY_ANNOTATION = 0xA,
+    BEJ_FORMAT_RESOURCE_LINK = 0x0E,
+    BEJ_FORMAT_RESOURCE_LINK_EXPANSION = 0x0F,
+    BEJ_FORMAT_UNKNOWN = 0xFF
 };
 
+enum eBEJflags {
+    BEJ_FLAG_DEFERRED = 1 << 0,
+    BEJ_FLAG_READONLY = 1 << 1,
+    BEJ_FLAG_NULLABLE = 1 << 2,
+    BEJ_FLAG_NESTED_TOP_LEVEL_ANNOTATION = 1 << 1
+};
+
+/**
+ * This one is a helper struct to store both header & data information as regards dictionary 
+ */
 typedef struct {
     uint8_t version_tag;
     uint8_t truncation_flag;    // not a flag but flags, only the named one is used though
@@ -27,6 +41,9 @@ typedef struct {
     size_t data_size;
 } bej_dictionary_context_t;
 
+/**
+ * Represents single dictionary entry
+ */
 typedef struct {
     uint8_t format;
     uint16_t sequence;
@@ -36,9 +53,10 @@ typedef struct {
     uint16_t name_offset;
 } bej_dict_entry_t;
 
-/*
-* @brief This one is a helper struct to maintain decoder context and mainly reduce verbosity
-*/
+/**
+ * This one is a helper struct to maintain decoder context and mainly reduce verbosity
+ * @todo Implement and integrate annotation dictionary logic
+ */
 typedef struct {
     bej_dictionary_context_t schema_dict;
     //bej_dictionary_t anno_dict;
@@ -51,56 +69,152 @@ typedef struct {
     uint16_t parent_child_count;
 } bej_context_t;
 
-/*
-* Converts BEJ encoded data to JSON format.
-* This function is main decoder interface.
-*/
-uint8_t bej_decode(bej_context_t *context);
+/**
+ * @brief Converts BEJ encoded data to JSON format. This function is main decoder interface.
+ * 
+ * @param ctx BEJ decoder context
+ * @return SUCCESS or FAILURE
+ */
+uint8_t bej_decode(bej_context_t *ctx);
 
-/*
-* Initializes the BEJ decoder context
-*/
+/**
+ * @brief Initialize BEJ decoder context
+ * 
+ * @param ctx Context to initialize
+ * @param schema_data Schema dictionary binary data
+ * @param schema_size Size of schema dictionary
+ * @param bej_data BEJ encoded data
+ * @param bej_size Size of BEJ data
+ * @param output Output stream for JSON
+ * @return SUCCESS or FAILURE
+ */
 uint8_t bej_init_context(bej_context_t *ctx,
-                     uint8_t *schema_data, size_t schema_size,
-                     uint8_t *bej_data, size_t bej_size,
-                     FILE *output);
+                         uint8_t *schema_data, size_t schema_size,
+                         uint8_t *bej_data, size_t bej_size,
+                         FILE *output);
 
-/*
-* Parses a BEJ dictionary header
-*/
+/**
+ * @brief Parse BEJ dictionary
+ * 
+ * @param dict Dictionary structure to populate
+ * @param data Dictionary binary data
+ * @param size Size of dictionary data
+ * @return SUCCESS or FAILURE
+ */
 uint8_t bej_parse_dict(bej_dictionary_context_t *dict, uint8_t *data, size_t size);
 
-/*
-* Decodes a BEJ Non-Negative integer value
-*/
+/**
+ * @brief Read NNINT (Non-Negative Integer) from BEJ stream
+ * 
+ * NNINT format: First byte is length, followed by value in little-endian
+ * 
+ * @param data Input data buffer
+ * @param offset Current offset (will be updated)
+ * @param size Total size of data
+ * @param value Output value
+ * @return SUCCESS or FAILURE
+ */
 uint8_t bej_read_nnint(uint8_t *data, size_t *offset, size_t size, uint32_t *value);
 
-/*
-* Decodes a BEJ sequence value and dictionary selector
-*/
+/**
+ * @brief Read and decode sequence number
+ * 
+ * @param data Input data buffer
+ * @param offset Current offset (will be updated)
+ * @param size Total size of data
+ * @param seqnum Output sequence number (bits 1-31)
+ * @param dictselector Output dictionary selector (bit 0)
+ * @return SUCCESS or FAILURE
+ */
 uint8_t bej_read_sequence_number(uint8_t *data, size_t *offset, size_t size, uint32_t *seqnum, uint8_t *dictselector);
 
-/*
-* Find dictionary entry by sequence number
-*/
+/**
+ * @brief Find dictionary entry by sequence number
+ * 
+ * @param ctx BEJ decoder context
+ * @param dict Dictionary to search
+ * @param sequence Sequence number to find
+ * @param entry Output entry structure
+ * @return SUCCESS or FAILURE
+ */
 uint8_t bej_find_dict_entry(bej_context_t *ctx, bej_dictionary_context_t *dict, uint32_t sequence, bej_dict_entry_t *entry);
 
-/*
-* Get dictionary entry name
-*/
+/**
+ * @brief Get dictionary entry name
+ * 
+ * @param dict Dictionary
+ * @param entry Dictionary entry
+ * @param name Output buffer for name
+ * @param name_size Size of output buffer
+ * @return SUCCESS or FAILURE
+ */
 uint8_t bej_get_entry_name(bej_dictionary_context_t *dict, bej_dict_entry_t *entry, 
-                       char *name, size_t name_size);
+                           char *name, size_t name_size);
 
+/**
+ * @brief Read and decode sequence number
+ * 
+ * @param data Input data buffer
+ * @param offset Current offset (will be updated)
+ * @param size Total size of data
+ * @param format Entry property format
+ * @param flags Lower nibble of format: [3] - reserved flag. [2] - nullable_property flag.
+ * [1] - read_only_property_and_top_level_annotation flag. [0] - deferred_binding flag.
+ * @return SUCCESS or FAILURE
+ */                       
 uint8_t bej_read_format(uint8_t *data, size_t *offset, size_t size, 
-                              uint8_t *format, uint8_t *flags);
+                        uint8_t *format, uint8_t *flags);
+
+/**
+ * @brief Recursively decode SFLV blocks starting from root
+ * 
+ * @param ctx BEJ decoder context
+ * @param dict Dictionary to search
+ * @param sequence Sequence number to find
+ * @param entry Output entry structure
+ * @return SUCCESS or FAILURE
+ */
 uint8_t decode_bej_sflv(bej_context_t *ctx, bej_dictionary_context_t *dict, 
                         uint8_t add_name);
+
+/**
+ * @brief Decode SFLV enum object
+ * 
+ * @param ctx BEJ decoder context
+ * @param value Integer value of the sequence number for the enumeration option selected
+ * @param length Value length
+ * @return SUCCESS or FAILURE
+ */
 uint8_t decode_enum(bej_context_t *ctx, uint8_t *value, uint32_t length,
                     bej_dictionary_context_t *dict);
+
+/**
+ * @brief Decode SFLV set object recursively
+ * 
+ * @param ctx BEJ decoder context
+ * @param length Value length
+ * @return SUCCESS or FAILURE
+ */
 uint8_t decode_set(bej_context_t *ctx, uint32_t length, 
                    bej_dictionary_context_t *dict, uint8_t add_name);
+
+/**
+ * @brief Decode SFLV array object recursively
+ * 
+ * @param ctx BEJ decoder context
+ * @param length Value length
+ * @return SUCCESS or FAILURE
+ */
 uint8_t decode_array(bej_context_t *ctx, uint32_t length,
                      bej_dictionary_context_t *dict, uint8_t add_name);
-void write_indent(bej_context_t *ctx);
 
+#ifdef NDEBUG
+/**
+ * @brief Dump dictionary contents for debugging
+ * 
+ * @param dict Dictionary to dump
+ * @param max_entries Maximum entries to dump (0 = all)
+ * @return nothing
+ */
 void bej_dump_dictionary(bej_dictionary_context_t *dict, uint16_t max_entries);
+#endif

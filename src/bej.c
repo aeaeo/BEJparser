@@ -158,7 +158,7 @@ bej_get_entry_name(bej_dictionary_context_t *dict, bej_dict_entry_t *entry,
     return SUCCESS;
 }
 
-void
+static void
 write_indent(bej_context_t *ctx)
 {
     for (int i = 0; i < ctx->indent_level; i++) {
@@ -494,6 +494,7 @@ bej_decode(bej_context_t *ctx)
     return decode_bej_sflv(ctx, &ctx->schema_dict, 0U);
 }
 
+#ifdef NDEBUG
 void
 bej_dump_dictionary(bej_dictionary_context_t *dict, uint16_t max_entries)
 {
@@ -553,7 +554,7 @@ bej_dump_dictionary(bej_dictionary_context_t *dict, uint16_t max_entries)
     
     infomsg("\n=== End Dictionary Dump ===\n");
 }
-
+#endif /* NDEBUG */
 
 uint8_t
 bej_init_context(bej_context_t *ctx,
@@ -574,7 +575,9 @@ bej_init_context(bej_context_t *ctx,
         return FAILURE;
     }
 
+#ifdef NDEBUG
     bej_dump_dictionary(&ctx->schema_dict, bej_size);
+#endif /* NDEBUG */
     
     /*if (anno_data && anno_size > 0) {
         bej_parse_dict(&ctx->anno_dict, anno_data, anno_size);

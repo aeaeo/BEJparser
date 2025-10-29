@@ -26,3 +26,6 @@ Decoding it with BEJparser and printing to stdout:
 
 .. or to the file:
 <img width="1440" height="452" alt="image" src="https://github.com/user-attachments/assets/0831d78b-5249-4086-ac83-937a76be89f1" />
+
+# Some unit tests
+<img width="791" height="652" alt="image" src="https://github.com/user-attachments/assets/429ec9f5-cd99-4eb2-8eb3-b42fba1ebf0e" />

@@ -270,7 +270,7 @@ decode_enum(bej_context_t *ctx, uint8_t *value, uint32_t length,
 
 uint8_t
 decode_set(bej_context_t *ctx, uint32_t length,
-           bej_dictionary_context_t *dict, uint8_t add_name)
+           bej_dictionary_context_t *dict)
 {
     fprintf(ctx->output, "{\n");
     ctx->indent_level++;
@@ -317,7 +317,7 @@ decode_set(bej_context_t *ctx, uint32_t length,
 
 uint8_t
 decode_array(bej_context_t *ctx, uint32_t length,
-             bej_dictionary_context_t *dict, uint8_t add_names)
+             bej_dictionary_context_t *dict)
 {   // same things as for set here except for no names
     fprintf(ctx->output, "[\n");
     ctx->indent_level++;
@@ -424,8 +424,8 @@ decode_bej_sflv(bej_context_t *ctx, bej_dictionary_context_t *dict,
             ctx->parent_child_offset[ctx->indent_level+1] = entry.child_offset;
             ctx->parent_child_count[ctx->indent_level+1] = entry.child_count;
 
-            return (!format) ? decode_set(ctx, length, dict, add_name) :
-                               decode_array(ctx, length, dict, add_name); }
+            return (!format) ? decode_set(ctx, length, dict) :
+                               decode_array(ctx, length, dict); }
         case BEJ_FORMAT_INTEGER:
             ctx->offset += length;  // move past value for recursive call
             return decode_integer(ctx, value, length);

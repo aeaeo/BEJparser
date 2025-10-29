@@ -35,7 +35,7 @@ read_file(const char *filename, uint8_t *buffer, size_t max_size)
     size_t file_size = (size_t)ftell(f);
     fseek(f, 0, SEEK_SET);
     
-    if (file_size < 0 || file_size > max_size) {
+    if (!file_size || file_size > max_size) {
         errmsg("File %s is too large or invalid\n", filename);
         fclose(f);
         return 0;

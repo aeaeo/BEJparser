@@ -225,10 +225,11 @@ uint8_t decode_enum(bej_context_t *ctx, uint8_t *value, uint32_t length,
  * 
  * @param ctx BEJ decoder context
  * @param length Value length
+ * @param dict Dictionary to search
  * @return SUCCESS or FAILURE
  */
 uint8_t decode_set(bej_context_t *ctx, uint32_t length, 
-                   bej_dictionary_context_t *dict, uint8_t add_name);
+                   bej_dictionary_context_t *dict);
 
 
 /**
@@ -236,10 +237,11 @@ uint8_t decode_set(bej_context_t *ctx, uint32_t length,
  * 
  * @param ctx BEJ decoder context
  * @param length Value length
+ * @param dict Dictionary to search
  * @return SUCCESS or FAILURE
  */
 uint8_t decode_array(bej_context_t *ctx, uint32_t length,
-                     bej_dictionary_context_t *dict, uint8_t add_name);
+                     bej_dictionary_context_t *dict);
 
 #ifdef NDEBUG
 /**

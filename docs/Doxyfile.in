@@ -1,0 +1,32 @@
+# project info
+PROJECT_NAME           = "@PROJECT_NAME@"
+PROJECT_BRIEF          = "@PROJECT_BRIEF@"
+PROJECT_NUMBER         = "@PROJECT_VERSION@"
+OUTPUT_DIRECTORY       = "@CMAKE_BINARY_DIR@/docs"
+CREATE_SUBDIRS         = YES
+
+# input
+INPUT                  = @CMAKE_SOURCE_DIR@/src
+RECURSIVE              = YES
+FILE_PATTERNS          = *.h *.c *.cpp
+
+# build settings
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = YES
+EXTRACT_STATIC         = YES
+
+# jotput formats
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+GENERATE_MAN           = NO
+GENERATE_RTF           = NO
+
+# source browsing
+SOURCE_BROWSER         = YES
+INLINE_SOURCES         = YES
+REFERENCED_BY_RELATION = YES
+REFERENCES_RELATION    = YES
+
+# miscellaneous
+QUIET                  = NO
+WARNINGS               = YES

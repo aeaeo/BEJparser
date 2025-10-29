@@ -55,6 +55,10 @@ if(BUILD_DOC)
     if(DOXYGEN_FOUND)
         set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile.in)
         set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
+
+        set(DOXYGEN_PROJECT_NAME "BEJparser")
+        set(DOXYGEN_PROJECT_BRIEF "A binary-encoded JSON (BEJ) parser following the DMTF DSP0218 specification")
+        set(DOXYGEN_PROJECT_VERSION "1.0.0")
         
         # Check if Doxyfile.in exists
         if(EXISTS ${DOXYGEN_IN})

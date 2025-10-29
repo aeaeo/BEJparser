@@ -65,8 +65,8 @@ typedef struct {
     size_t offset;
     FILE *output;
     int indent_level;
-    uint16_t parent_child_offset;
-    uint16_t parent_child_count;
+    uint16_t parent_child_offset[BEJ_CONTEXT_STACK_MAX_DEPTH];
+    uint16_t parent_child_count[BEJ_CONTEXT_STACK_MAX_DEPTH];
 } bej_context_t;
 
 /**
@@ -170,8 +170,7 @@ uint8_t bej_read_format(uint8_t *data, size_t *offset, size_t size,
  * 
  * @param ctx BEJ decoder context
  * @param dict Dictionary to search
- * @param sequence Sequence number to find
- * @param entry Output entry structure
+ * @param add_name Whether entry name must be written to ctx->output. 1U - Write name; 0 - Don't
  * @return SUCCESS or FAILURE
  */
 uint8_t decode_bej_sflv(bej_context_t *ctx, bej_dictionary_context_t *dict, 

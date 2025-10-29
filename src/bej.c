@@ -91,8 +91,12 @@ bej_find_dict_entry(bej_context_t *ctx, bej_dictionary_context_t *dict,
         return FAILURE;
     }
 
-    size_t offset = ctx->parent_child_offset; // skip header or go to child
-    uint16_t count = ctx->parent_child_count;
+    /* start from global data offset just after the header
+    *  unless parent entry has both entry->child_offset
+    *  and entry->child_count specified; exception is for the root
+    */
+    size_t offset = ctx->parent_child_offset[ctx->indent_level];
+    uint16_t count = ctx->parent_child_count[ctx->indent_level];
 
     for (uint16_t i = 0; i < count; i++) {
         if (offset + 12UL > dict->data_size) {
@@ -243,21 +247,15 @@ decode_enum(bej_context_t *ctx, uint8_t *value, uint32_t length,
     // find enum string in child entries
     bej_dict_entry_t enum_entry;
     if (!bej_find_dict_entry(ctx, dict, enum_value, &enum_entry)) {
-        char enum_name[256];
+        char enum_name[BEJ_DICT_ENTRY_NAME_LENGTH+1];
         if (!bej_get_entry_name(dict, &enum_entry, enum_name, sizeof(enum_name))) {
             fprintf(ctx->output, "\"%s\"", enum_name);
-
-            ctx->parent_child_offset = 12U;
-            ctx->parent_child_count = dict->entry_count;
 
             return SUCCESS;
         }
     }
     // print numeric then
     fprintf(ctx->output, "%u", enum_value);
-
-    ctx->parent_child_offset = 12U;
-    ctx->parent_child_count = dict->entry_count;
 
     return SUCCESS;
 }
@@ -269,8 +267,7 @@ decode_set(bej_context_t *ctx, uint32_t length,
     fprintf(ctx->output, "{\n");
     ctx->indent_level++;
     
-    size_t set_start = ctx->offset;
-    size_t set_end = set_start + length;
+    size_t set_end = ctx->offset + length;
     
     uint32_t count = 0U;    // reading elements count first
     if (bej_read_nnint(ctx->bej_data, &ctx->offset, ctx->bej_size, &count)) {
@@ -306,9 +303,6 @@ decode_set(bej_context_t *ctx, uint32_t length,
                 set_end, ctx->offset);
         ctx->offset = set_end;
     }
-
-    ctx->parent_child_offset = 12U;
-    ctx->parent_child_count = dict->entry_count;
     
     return SUCCESS;
 }
@@ -320,8 +314,7 @@ decode_array(bej_context_t *ctx, uint32_t length,
     fprintf(ctx->output, "[\n");
     ctx->indent_level++;
     
-    size_t array_start = ctx->offset;
-    size_t array_end = array_start + length;
+    size_t array_end = ctx->offset + length;
     
     uint32_t count = 0U; 
     if (bej_read_nnint(ctx->bej_data, &ctx->offset, ctx->bej_size, &count)) {
@@ -356,9 +349,6 @@ decode_array(bej_context_t *ctx, uint32_t length,
                 array_end, ctx->offset);
         ctx->offset = array_end;
     }
-
-    ctx->parent_child_offset = 12UL;
-    ctx->parent_child_count = dict->entry_count;
     
     return SUCCESS;
 }
@@ -400,7 +390,7 @@ decode_bej_sflv(bej_context_t *ctx, bej_dictionary_context_t *dict,
     uint8_t found_entry = !bej_find_dict_entry(ctx, dict, sequence, &entry);
     
     if (found_entry) {
-        char name[256] = {0};
+        char name[BEJ_DICT_ENTRY_NAME_LENGTH+1] = {0};
         bej_get_entry_name(dict, &entry, name, sizeof(name));
         
         dbgmsg("Decoding entry: seq=%u, format=%u, name=\"%s\"", 
@@ -415,14 +405,20 @@ decode_bej_sflv(bej_context_t *ctx, bej_dictionary_context_t *dict,
             fprintf(ctx->output, "\"unknown_%u\": ", sequence);
         }
     }
-    
+
     switch (format) {
         case BEJ_FORMAT_SET:
-        case BEJ_FORMAT_ARRAY:
-            ctx->parent_child_offset = entry.child_offset;
-            ctx->parent_child_count = entry.child_count;
+        case BEJ_FORMAT_ARRAY: {
+            if (ctx->indent_level + 1 >= BEJ_CONTEXT_STACK_MAX_DEPTH) {
+                errmsg("BEJ nesting too deep");
+                return FAILURE;
+            }
+            //ctx->indent_level++;
+            ctx->parent_child_offset[ctx->indent_level+1] = entry.child_offset;
+            ctx->parent_child_count[ctx->indent_level+1] = entry.child_count;
+
             return (!format) ? decode_set(ctx, length, dict, add_name) :
-                               decode_array(ctx, length, dict, add_name);
+                               decode_array(ctx, length, dict, add_name); }
         case BEJ_FORMAT_INTEGER:
             ctx->offset += length;  // move past value for recursive call
             return decode_integer(ctx, value, length);
@@ -431,8 +427,8 @@ decode_bej_sflv(bej_context_t *ctx, bej_dictionary_context_t *dict,
             return decode_string(ctx, value, length);
         case BEJ_FORMAT_ENUM:
             ctx->offset += length;
-            ctx->parent_child_offset = entry.child_offset;
-            ctx->parent_child_count = entry.child_count;
+            ctx->parent_child_offset[ctx->indent_level+1] = entry.child_offset;
+            ctx->parent_child_count[ctx->indent_level+1] = entry.child_count;
             return decode_enum(ctx, value, length, dict);
         case BEJ_FORMAT_BOOLEAN:
             ctx->offset += length;
@@ -588,8 +584,8 @@ bej_init_context(bej_context_t *ctx,
     ctx->offset = 0UL;
     ctx->output = output;
     ctx->indent_level = 0;
-    ctx->parent_child_offset = 12L;
-    ctx->parent_child_count = ctx->schema_dict.entry_count;
+    ctx->parent_child_offset[0] = 12L;
+    ctx->parent_child_count[0] = ctx->schema_dict.entry_count;
     
     return SUCCESS;
 }

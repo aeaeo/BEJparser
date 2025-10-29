@@ -6,6 +6,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define SUCCESS 0
+#define FAILURE 1
+
+#define BEJ_CONTEXT_STACK_MAX_DEPTH ((uint8_t)16)
+#define BEJ_DICT_ENTRY_NAME_LENGTH ((uint8_t)255)
+
 #define READ_U8_AND_INC(ptr, off) ((uint8_t)(ptr[off++]))
 #define READ_U16_LE(ptr, off) ((uint16_t)(ptr[off + 1] << 8) | (uint16_t)(ptr[off]))
 #define READ_U32_LE(ptr, off) ((uint32_t)(ptr[off + 3] << 24) | ((uint32_t)(ptr[off + 2] << 16)) | \
@@ -26,6 +32,3 @@
 
 #define infomsg(fmt, ...) \
     fprintf(stdout, fmt "\n", ##__VA_ARGS__)
-
-#define SUCCESS 0
-#define FAILURE 1
